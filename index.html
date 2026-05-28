@@ -85,7 +85,12 @@
         .cell.selected { background: #93c5fd !important; }
         .cell.peer { background: #e0f2fe; }
         .cell.same-number { background: #fef3c7 !important; }
-        .cell.error { color: #dc2626; }
+        .cell.error {
+            background: #fecaca !important;
+            color: #b91c1c !important;
+            box-shadow: inset 0 0 0 2px #ef4444;
+        }
+        .cell.fixed.error { background: #fca5a5 !important; color: #991b1b !important; }
         .cell.user-filled { color: #007aff; }
         .cell.hint-filled { color: #059669; }
 
@@ -279,6 +284,40 @@
             return true;
         }
 
+        function findConflicts() {
+            const conflicts = new Set();
+            const mark = (r1, c1, r2, c2) => {
+                conflicts.add(r1 * 9 + c1);
+                conflicts.add(r2 * 9 + c2);
+            };
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const n = board[r][c];
+                    if (!n) continue;
+                    for (let cc = c + 1; cc < 9; cc++) {
+                        if (board[r][cc] === n) mark(r, c, r, cc);
+                    }
+                    for (let rr = r + 1; rr < 9; rr++) {
+                        if (board[rr][c] === n) mark(r, c, rr, c);
+                    }
+                }
+            }
+            for (let br = 0; br < 9; br += 3) {
+                for (let bc = 0; bc < 9; bc += 3) {
+                    for (let i = 0; i < 9; i++) {
+                        const r1 = br + Math.floor(i / 3), c1 = bc + (i % 3);
+                        const n = board[r1][c1];
+                        if (!n) continue;
+                        for (let j = i + 1; j < 9; j++) {
+                            const r2 = br + Math.floor(j / 3), c2 = bc + (j % 3);
+                            if (board[r2][c2] === n) mark(r1, c1, r2, c2);
+                        }
+                    }
+                }
+            }
+            return conflicts;
+        }
+
         function createPuzzle(full) {
             const holes = PUZZLE_HOLES;
             const puzzle = full.map(row => [...row]);
@@ -340,8 +379,7 @@
         function toggleNotesMode() {
             notesMode = !notesMode;
             document.getElementById('notesBtn').classList.toggle('active-mode', notesMode);
-            document.getElementById('status').textContent = notesMode ? '笔记模式：点数字切换候选' : '';
-            if (!notesMode) document.getElementById('status').textContent = '';
+            updateView();
         }
 
         function pushUndo() {
@@ -476,6 +514,7 @@
         function updateView() {
             const selVal = selected ? board[selected[0]][selected[1]] : 0;
             const remaining = countRemaining();
+            const conflicts = findConflicts();
 
             for (let i = 0; i < 81; i++) {
                 const r = Math.floor(i / 9), c = i % 9;
@@ -494,7 +533,7 @@
                     else if (isPeer(sr, sc, r, c)) cell.classList.add('peer');
                 }
                 if (selVal !== 0 && val === selVal) cell.classList.add('same-number');
-                if (val !== 0 && !isValidWithSkip(board, r, c, val)) cell.classList.add('error');
+                if (conflicts.has(i)) cell.classList.add('error');
 
                 if (val !== 0) {
                     cell.textContent = val;
@@ -510,6 +549,20 @@
                 countEl.textContent = left < 9 ? left : '';
                 btn.disabled = left === 0 && !notesMode;
             });
+
+            if (!isPaused) {
+                const statusEl = document.getElementById('status');
+                if (conflicts.size > 0) {
+                    statusEl.textContent = '存在重复数字，请检查红色高亮格子';
+                    statusEl.style.color = '#dc2626';
+                } else if (notesMode) {
+                    statusEl.textContent = '笔记模式：点数字切换候选';
+                    statusEl.style.color = '#8e8e93';
+                } else {
+                    statusEl.textContent = '';
+                    statusEl.style.color = '#8e8e93';
+                }
+            }
         }
 
         function countRemaining() {
@@ -570,6 +623,7 @@
         }
 
         function checkWin() {
+            if (findConflicts().size > 0) return;
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
                     if (board[r][c] === 0) return;
