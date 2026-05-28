@@ -474,6 +474,21 @@
             return Math.floor(r1 / 3) === Math.floor(r2 / 3) && Math.floor(c1 / 3) === Math.floor(c2 / 3);
         }
 
+        function clearNotesForNumber(r, c, n) {
+            if (!n) return;
+            for (let i = 0; i < 9; i++) {
+                if (i !== c) notes[r][i].delete(n);
+                if (i !== r) notes[i][c].delete(n);
+            }
+            const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const rr = br + i, cc = bc + j;
+                    if (rr !== r || cc !== c) notes[rr][cc].delete(n);
+                }
+            }
+        }
+
         function initGrid() {
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
@@ -604,6 +619,7 @@
             pushUndo();
             board[r][c] = n || 0;
             notes[r][c].clear();
+            if (n) clearNotesForNumber(r, c, n);
             saveGame();
             updateView();
             checkWin();
@@ -614,8 +630,10 @@
             const [r, c] = selected;
             if (fixed[r][c] || board[r][c] === solution[r][c]) return;
             pushUndo();
-            board[r][c] = solution[r][c];
+            const n = solution[r][c];
+            board[r][c] = n;
             notes[r][c].clear();
+            clearNotesForNumber(r, c, n);
             fixed[r][c] = true;
             saveGame();
             updateView();
