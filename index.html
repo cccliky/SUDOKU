@@ -106,6 +106,12 @@
         }
         .notes-grid span { display: flex; align-items: center; justify-content: center; }
         .notes-grid span.on { color: #5856d6; font-weight: 700; }
+        .notes-grid span.same-note {
+            background: #fde68a;
+            border-radius: 2px;
+            color: #b45309;
+            font-weight: 800;
+        }
 
         .numpad {
             display: grid;
@@ -178,6 +184,8 @@
         <button class="secondary" onclick="solveOne()">提示</button>
         <button class="secondary" onclick="undo()" id="undoBtn" disabled>撤销</button>
         <button class="notes-toggle" id="notesBtn" onclick="toggleNotesMode()">笔记</button>
+        <button class="secondary" onclick="autoFillNotes()">自动笔记</button>
+        <button class="secondary" onclick="clearAllNotes()">清除笔记</button>
         <button class="secondary" onclick="togglePause()">暂停</button>
         <button class="warning" id="resumeBtn" onclick="loadGame()" style="display:none">继续</button>
     </div>
@@ -382,6 +390,48 @@
             updateView();
         }
 
+        function autoFillNotes() {
+            if (isPaused) return;
+            pushUndo();
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] !== 0) continue;
+                    notes[r][c].clear();
+                    for (let n = 1; n <= 9; n++) {
+                        if (isValid(board, r, c, n)) notes[r][c].add(n);
+                    }
+                }
+            }
+            saveGame();
+            updateView();
+            if (!isPaused) {
+                document.getElementById('status').textContent = '已填入所有空白格的候选数';
+                document.getElementById('status').style.color = '#8e8e93';
+            }
+        }
+
+        function clearAllNotes() {
+            if (isPaused) return;
+            let hasNotes = false;
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (notes[r][c].size > 0) { hasNotes = true; break; }
+                }
+                if (hasNotes) break;
+            }
+            if (!hasNotes) return;
+            pushUndo();
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) notes[r][c].clear();
+            }
+            saveGame();
+            updateView();
+            if (!isPaused) {
+                document.getElementById('status').textContent = '已清除所有笔记';
+                document.getElementById('status').style.color = '#8e8e93';
+            }
+        }
+
         function pushUndo() {
             undoStack.push({
                 board: board.map(r => [...r]),
@@ -506,7 +556,7 @@
             }
         }
 
-        function renderNotesEl(cell, r, c) {
+        function renderNotesEl(cell, r, c, highlightNum) {
             let ng = cell.querySelector('.notes-grid');
             if (!ng) {
                 ng = document.createElement('div');
@@ -523,6 +573,7 @@
                 const n = +sp.dataset.n;
                 sp.textContent = set.has(n) ? n : '';
                 sp.classList.toggle('on', set.has(n));
+                sp.classList.toggle('same-note', highlightNum !== 0 && n === highlightNum && set.has(n));
             });
         }
 
@@ -547,13 +598,20 @@
                     if (r === sr && c === sc) cell.classList.add('selected');
                     else if (isPeer(sr, sc, r, c)) cell.classList.add('peer');
                 }
-                if (selVal !== 0 && val === selVal) cell.classList.add('same-number');
+                if (selVal !== 0) {
+                    const hasSameNote = val === 0 && notes[r][c].has(selVal);
+                    const hasSameFill = val === selVal;
+                    const isSelectedCell = selected && r === selected[0] && c === selected[1];
+                    if ((hasSameFill || hasSameNote) && !isSelectedCell) {
+                        cell.classList.add('same-number');
+                    }
+                }
                 if (conflicts.has(i)) cell.classList.add('error');
 
                 if (val !== 0) {
                     cell.textContent = val;
                 } else if (notes[r][c].size > 0) {
-                    renderNotesEl(cell, r, c);
+                    renderNotesEl(cell, r, c, selVal);
                 }
             }
 
